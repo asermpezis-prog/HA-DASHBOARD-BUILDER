@@ -1,0 +1,29 @@
+# HA-DASHBOARD-BUILDER – Home-Assistant-Dashboards per Drag & Drop bearbeiten, übertragen, versionieren
+# Einstellungen: .env (HA_URL, HA_TOKEN) – Versionen liegen in ./data/versions.db
+services:
+  web:
+    build: .
+    image: ha-dashboard-builder:local
+    container_name: ha-dashboard-builder
+    restart: unless-stopped
+    # Läuft als sakis; ./data muss sakis gehören (sonst legt Docker ihn als root an): mkdir -p data
+    user: "${UID:-1000}:${GID:-1000}"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PORT: "8114"
+      DATA_DIR: /data
+    ports: ["8114:8114"]
+    volumes:
+      - ./data:/data
+    read_only: true
+    tmpfs: [/tmp]
+    mem_limit: 256m
+    pids_limit: 64
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8114/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

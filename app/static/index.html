@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dashboard Builder</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="mdi/css/materialdesignicons.min.css">
+<link rel="stylesheet" href="style.css?v=0.1.0">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><i class="mdi mdi-view-dashboard-edit"></i> Dashboard Builder</div>
+  <span id="mode" class="pill"></span>
+  <select id="dashSelect" title="Dashboard wählen"></select>
+  <button id="btnReload" title="Aktuellen Stand aus Home Assistant laden"><i class="mdi mdi-download"></i> Aus HA laden</button>
+  <span class="spacer"></span>
+  <span id="dirty" class="dirty" hidden>● nicht übertragen</span>
+  <button id="btnUndo" title="Rückgängig (Strg+Z)"><i class="mdi mdi-undo"></i></button>
+  <button id="btnRedo" title="Wiederholen (Strg+Y)"><i class="mdi mdi-redo"></i></button>
+  <button id="btnYaml" title="Gesamte Konfiguration als YAML"><i class="mdi mdi-code-braces"></i> YAML</button>
+  <button id="btnSaveVersion"><i class="mdi mdi-content-save-outline"></i> Version speichern</button>
+  <button id="btnVersions"><i class="mdi mdi-history"></i> Versionen</button>
+  <button id="btnPush" class="primary"><i class="mdi mdi-upload"></i> Übertragen …</button>
+</header>
+
+<div class="layout">
+  <aside class="palette">
+    <section>
+      <h3>Bausteine</h3>
+      <div id="blocks" class="blocks"></div>
+    </section>
+    <section class="ents">
+      <h3>Entitäten <span id="entCount" class="muted"></span></h3>
+      <input id="search" type="search" placeholder="Suchen (Name, ID, Bereich) …">
+      <div class="row">
+        <select id="areaFilter"></select>
+        <select id="domainFilter"></select>
+      </div>
+      <label class="chk"><input type="checkbox" id="unusedOnly"> nur noch nicht verwendete</label>
+      <label class="chk"><input type="checkbox" id="hideDiag" checked> Diagnose/Konfiguration ausblenden</label>
+      <label class="cardtype">Neue Karte als
+        <select id="cardType">
+          <option value="tile">Tile</option>
+          <option value="mushroom-template">Mushroom Template (Raum)</option>
+          <option value="mushroom-entity">Mushroom Entity</option>
+          <option value="button">Button</option>
+          <option value="entities">Entities-Liste</option>
+          <option value="sensor">Sensor (Graph)</option>
+          <option value="history">Verlauf</option>
+        </select>
+      </label>
+      <div id="entityList" class="entlist"></div>
+    </section>
+  </aside>
+
+  <main class="main">
+    <nav id="viewTabs" class="tabs"></nav>
+    <div id="viewBar" class="viewbar"></div>
+    <div id="board"></div>
+  </main>
+
+  <aside id="versionsPanel" class="versions" hidden>
+    <div class="vhead"><h3>Versionen</h3><button id="btnCloseVersions" title="Schließen"><i class="mdi mdi-close"></i></button></div>
+    <div id="versionList"></div>
+  </aside>
+</div>
+
+<div id="modal" class="modal" hidden>
+  <div class="modal-box">
+    <h2 id="modalTitle"></h2>
+    <div id="modalBody" class="modal-body"></div>
+    <div id="modalActions" class="modal-actions"></div>
+  </div>
+</div>
+<div id="toasts" class="toasts"></div>
+<script src="app.js?v=0.1.0"></script>
+</body>
+</html>
