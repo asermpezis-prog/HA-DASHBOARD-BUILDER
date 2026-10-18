@@ -53,6 +53,9 @@ DEMO=1 DATA_DIR=/tmp/hdb python3 -m unittest discover -s tests
 | Abschnitt verschieben | am Griff ⠿ ziehen; Breite mit ↔-Buttons |
 | Karte in andere Ansicht | Karte auf den Tab der Ziel-Ansicht ziehen |
 | Karte bearbeiten | Doppelklick oder ✎: YAML-Editor |
+| Dashboard kopieren | „Kopieren …“ oben: neues Dashboard in HA anlegen, das Original bleibt unverändert |
+| Vorlage speichern | über eine Karte fahren → ★ |
+| Vorlage einfügen | Vorlage aus der Palette ziehen → Bereich wählen: Entitäten und Raumname werden getauscht |
 | Masonry-Ansicht | „In Abschnitte umwandeln“ macht daraus eine Sections-Ansicht |
 
 **Wichtig:** Änderungen sind erst nach **Übertragen …** in Home Assistant aktiv. „Version speichern“ sichert nur einen Entwurf in der App. Unbekannte Optionen und Karten (custom cards, card-mod usw.) bleiben unverändert erhalten. Dashboards im **YAML-Modus** kann HA nicht über die API speichern; diese kannst du nur ansehen und herunterladen.

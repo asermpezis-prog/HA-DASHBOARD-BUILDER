@@ -2,6 +2,7 @@
 import base64
 import difflib
 import os
+import re
 import secrets
 from pathlib import Path
 
@@ -132,6 +133,65 @@ async def push(body: dict = Body(...)):
     await backend.save_config(url_path(key), cfg)
     vid, _ = store.add(key, "push", message, cfg)
     return {"changed": True, "version": vid, "backup": backup_id, "hash": config_hash(cfg)}
+
+
+URL_PATH_RE = re.compile(r"[a-z0-9]+(-[a-z0-9]+)+")
+
+
+@app.post("/api/dashboards/copy")
+async def copy_dashboard(body: dict = Body(...)):
+    """Legt in HA ein neues Dashboard an und speichert die übergebene (oder die aktuelle HA-) Konfiguration hinein."""
+    source = body.get("source") or DEFAULT_KEY
+    new_path = (body.get("url_path") or "").strip().lower()
+    title = (body.get("title") or "").strip()
+    if not title:
+        raise HTTPException(400, "Bitte einen Titel angeben.")
+    if not URL_PATH_RE.fullmatch(new_path):
+        raise HTTPException(400, "Die URL darf nur Kleinbuchstaben, Ziffern und Bindestriche enthalten "
+                                 "und muss mindestens einen Bindestrich haben (z. B. enterprise-neu).")
+    existing = {d["key"] for d in await backend.dashboards()}
+    if new_path in existing:
+        raise HTTPException(409, f"Ein Dashboard mit der URL „{new_path}“ gibt es schon.")
+    cfg = body.get("config")
+    if not isinstance(cfg, dict):
+        cfg = await backend.get_config(url_path(source))
+    if isinstance(cfg.get("title"), str):
+        cfg = {**cfg, "title": title}
+    await backend.create_dashboard(new_path, title, body.get("icon") or None, body.get("show_in_sidebar", True))
+    await backend.save_config(new_path, cfg)
+    vid, _ = store.add(new_path, "push", f"Kopie von „{source if source != DEFAULT_KEY else 'Standard'}“ angelegt", cfg)
+    return {"key": new_path, "version": vid}
+
+
+# --------------------------------------------------------------------------- Vorlagen
+
+@app.get("/api/templates")
+async def templates():
+    return store.list_templates()
+
+
+@app.post("/api/templates")
+async def add_template(body: dict = Body(...)):
+    card = body.get("card")
+    name = (body.get("name") or "").strip()
+    if not isinstance(card, dict) or not name:
+        raise HTTPException(400, "Name und Karte sind nötig.")
+    return {"id": store.add_template(name, card)}
+
+
+@app.patch("/api/templates/{tid}")
+async def rename_template(tid: int, body: dict = Body(...)):
+    name = (body.get("name") or "").strip()
+    if not name:
+        raise HTTPException(400, "Name fehlt.")
+    store.rename_template(tid, name)
+    return {"ok": True}
+
+
+@app.delete("/api/templates/{tid}")
+async def delete_template(tid: int):
+    store.delete_template(tid)
+    return {"ok": True}
 
 
 # --------------------------------------------------------------------------- Versionen

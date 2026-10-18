@@ -143,3 +143,22 @@ textarea.code { width: 100%; min-height: 55vh; font: 13px/1.45 ui-monospace, SFM
   .board { grid-template-columns: 1fr !important; }
   .section { grid-column: auto !important; }
 }
+
+/* Vorlagen */
+.tpllist { display: flex; flex-direction: column; gap: 4px; max-height: 26vh; overflow-y: auto; }
+.tpl { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border: 1px dashed var(--line); border-radius: 8px; cursor: grab; user-select: none; background: var(--panel2); }
+.tpl:hover { border-color: var(--accent); }
+.tpl > .mdi { color: var(--accent); }
+.tpl .tpl-text { flex: 1; min-width: 0; }
+.tpl .tpl-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tpl .tpl-sub { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tpl .icon { opacity: 0; } .tpl:hover .icon { opacity: 1; }
+.hint { color: var(--muted); font-size: 12px; }
+.form { display: grid; grid-template-columns: max-content 1fr; gap: 8px 12px; align-items: center; }
+.form label.full { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; }
+.maptable { width: 100%; border-collapse: collapse; font-size: 13px; }
+.maptable td { padding: 4px 6px; border-top: 1px solid var(--line); vertical-align: middle; }
+.maptable td:first-child { width: 45%; }
+.maptable input { width: 100%; font-family: ui-monospace, monospace; font-size: 12px; }
+.maptable tr.nomatch input { border-color: var(--warn); }
+.maptable small { color: var(--muted); display: block; }

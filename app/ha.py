@@ -118,6 +118,13 @@ class HAClient:
     async def save_config(self, url_path, config):
         await self.call({"type": "lovelace/config/save", "url_path": url_path, "config": config})
 
+    async def create_dashboard(self, url_path, title, icon=None, show_in_sidebar=True):
+        msg = {"type": "lovelace/dashboards/create", "url_path": url_path, "title": title,
+               "mode": "storage", "show_in_sidebar": bool(show_in_sidebar), "require_admin": False}
+        if icon:
+            msg["icon"] = icon
+        await self.call(msg)
+
 
 # --------------------------------------------------------------------------- Demo
 
@@ -202,10 +209,17 @@ class DemoBackend:
     def __init__(self):
         self.states, self.areas, self.registry, self.floors, cfg = _demo_data()
         self.configs = {None: cfg, "dashboard-test": {"views": []}}
+        self.dash_list = [{"key": "dashboard-test", "title": "Test-Dashboard (Demo)", "mode": "storage", "icon": "mdi:flask"}]
 
     async def dashboards(self):
         return [{"key": DEFAULT_KEY, "title": "Enterprise (Demo)", "mode": "storage", "icon": "mdi:view-dashboard"},
-                {"key": "dashboard-test", "title": "Test-Dashboard (Demo)", "mode": "storage", "icon": "mdi:flask"}]
+                *copy.deepcopy(self.dash_list)]
+
+    async def create_dashboard(self, url_path, title, icon=None, show_in_sidebar=True):
+        if url_path in self.configs:
+            raise HAError(f"Die URL „{url_path}“ ist bereits vergeben", "home_assistant_error")
+        self.dash_list.append({"key": url_path, "title": title, "mode": "storage", "icon": icon})
+        self.configs[url_path] = {"views": []}
 
     async def entities(self):
         return build_entities(self.states, self.areas, [], self.registry, self.floors)

@@ -92,6 +92,40 @@ class TestApi(unittest.TestCase):
                             "base_hash": r["hash"], "force": True}))
         self.assertTrue(ok["changed"])
 
+    def test_copy_dashboard(self):
+        src = run(main.get_config(DEFAULT_KEY))["config"]
+        r = run(main.copy_dashboard({"source": DEFAULT_KEY, "title": "Enterprise Neu", "url_path": "enterprise-neu"}))
+        self.assertEqual(r["key"], "enterprise-neu")
+        keys = [d["key"] for d in run(main.dashboards())]
+        self.assertIn("enterprise-neu", keys)
+        copied = run(main.get_config("enterprise-neu"))["config"]
+        self.assertEqual(copied["views"], src["views"])
+        self.assertEqual(copied["title"], "Enterprise Neu")
+        # Original unverändert
+        self.assertEqual(run(main.get_config(DEFAULT_KEY))["config"], src)
+        # doppelte URL und ungültige URL werden abgelehnt
+        for bad in ("enterprise-neu", "ohnebindestrich", "Gross-Buchstaben!"):
+            with self.assertRaises(main.HTTPException):
+                run(main.copy_dashboard({"source": DEFAULT_KEY, "title": "X", "url_path": bad}))
+
+    def test_copy_uses_editor_config(self):
+        cfg = {"views": [{"title": "Nur im Editor"}]}
+        r = run(main.copy_dashboard({"source": DEFAULT_KEY, "title": "Aus Editor", "url_path": "aus-editor", "config": cfg}))
+        self.assertEqual(run(main.get_config(r["key"]))["config"], cfg)
+
+    def test_templates(self):
+        card = {"type": "custom:mushroom-template-card", "primary": "Technikraum",
+                "secondary": "{{ states('sensor.technikraum_temperatur') }} °C"}
+        tid = run(main.add_template({"name": "Raumkarte", "card": card}))["id"]
+        tpls = run(main.templates())
+        self.assertEqual([t["card"] for t in tpls if t["id"] == tid], [card])
+        run(main.rename_template(tid, {"name": "Raum"}))
+        self.assertIn("Raum", [t["name"] for t in run(main.templates())])
+        run(main.delete_template(tid))
+        self.assertNotIn(tid, [t["id"] for t in run(main.templates())])
+        with self.assertRaises(main.HTTPException):
+            run(main.add_template({"name": "", "card": card}))
+
     def test_health(self):
         self.assertTrue(run(main.health())["ok"])
 

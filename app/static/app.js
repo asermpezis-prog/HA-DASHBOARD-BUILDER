@@ -3,10 +3,11 @@
 
 const $ = (s) => document.querySelector(s);
 const DEFAULT_KEY = '__default__';
+const DROP_SRC = ['entity', 'block', 'card', 'template'];
 
 const S = {
   dashboards: [], dash: null, config: null, baseHash: null, baseJSON: '',
-  entities: [], entMap: {}, view: 0, undo: [], redo: [], drag: null,
+  entities: [], entMap: {}, templates: [], view: 0, undo: [], redo: [], drag: null,
 };
 
 // ------------------------------------------------------------------ Hilfen
@@ -216,15 +217,15 @@ async function init() {
     $('#board').replaceChildren(el('div', { class: 'notice' }, 'Keine Verbindung zu Home Assistant: ', e.message));
     return;
   }
+  fillDashSelect();
   const sel = $('#dashSelect');
-  sel.replaceChildren(...S.dashboards.map((d) => el('option', { value: d.key },
-    d.title + (d.mode === 'yaml' ? ' (YAML-Modus, nur lesen)' : ''))));
   let start = null;
   try { start = localStorage.getItem('hdb.dash'); } catch { /* egal */ }
   if (!S.dashboards.some((d) => d.key === start)) start = S.dashboards[0].key;
   sel.value = start;
 
   loadEntities();
+  loadTemplates();
   await loadDashboard(start);
 }
 
@@ -240,6 +241,7 @@ async function loadEntities() {
   $('#domainFilter').replaceChildren(el('option', { value: '' }, 'Alle Typen'),
     ...domains.map((d) => el('option', { value: d }, d)));
   render();
+  renderTemplates();
 }
 
 async function loadDashboard(key) {
@@ -415,13 +417,14 @@ function renderNewSection() {
     el('div', {}, el('i', { class: 'mdi mdi-plus-box-outline' }), el('br'), 'Neuer Abschnitt', el('br'),
       el('small', {}, 'klicken oder Element hierher ziehen')));
   z.addEventListener('dragover', (e) => {
-    if (!S.drag || !['entity', 'block', 'card'].includes(S.drag.src)) return;
+    if (!S.drag || !DROP_SRC.includes(S.drag.src)) return;
     e.preventDefault(); z.classList.add('drop-hl');
   });
   z.addEventListener('dragleave', () => z.classList.remove('drop-hl'));
   z.addEventListener('drop', (e) => {
     e.preventDefault(); z.classList.remove('drop-hl');
     const d = S.drag; if (!d) return;
+    if (d.src === 'template') { insertTemplate(d.id, { newSection: true }); return; }
     mutate(() => {
       const v = curView();
       let card;
@@ -443,7 +446,7 @@ function renderCards(v, cid, masonry) {
 
   body.addEventListener('dragover', (e) => {
     const d = S.drag;
-    if (!d || !['entity', 'block', 'card'].includes(d.src)) return;
+    if (!d || !DROP_SRC.includes(d.src)) return;
     e.preventDefault(); e.stopPropagation();
     e.dataTransfer.dropEffect = d.src === 'card' ? 'move' : 'copy';
     clearMarks();
@@ -459,7 +462,7 @@ function renderCards(v, cid, masonry) {
   body.addEventListener('dragleave', (e) => { if (!body.contains(e.relatedTarget)) clearMarks(); });
   body.addEventListener('drop', (e) => {
     const d = S.drag;
-    if (!d || !['entity', 'block', 'card'].includes(d.src)) return;
+    if (!d || !DROP_SRC.includes(d.src)) return;
     e.preventDefault(); e.stopPropagation();
     const t = dropTarget(body, e);
     clearMarks();
@@ -487,6 +490,7 @@ function dropTarget(body, e) {
 }
 
 function handleDrop(cid, t, d) {
+  if (d.src === 'template') { insertTemplate(d.id, { cid, index: t.index, view: S.view }); return; }
   if (d.src === 'card' && d.view === S.view && d.cid === cid && t.into == null &&
       (t.index === d.index || t.index === d.index + 1)) return; // keine Bewegung
   mutate(() => {
@@ -536,6 +540,7 @@ function renderCard(c, cid, i) {
       el('span', { class: 'badge' }, info.type)),
     el('div', { class: 'card-actions' },
       el('button', { class: 'icon', title: 'Bearbeiten (YAML)', onclick: () => editCard(cid, i) }, el('i', { class: 'mdi mdi-pencil-outline' })),
+      el('button', { class: 'icon', title: 'Als Vorlage speichern', onclick: () => saveAsTemplate(c) }, el('i', { class: 'mdi mdi-star-outline' })),
       el('button', { class: 'icon', title: 'Duplizieren', onclick: () => mutate(() => {
         const arr = getCards(curView(), cid); arr.splice(i + 1, 0, clone(arr[i]));
       }) }, el('i', { class: 'mdi mdi-content-copy' })),
@@ -598,6 +603,7 @@ function buildStaticUI() {
   };
   $('#btnCloseVersions').onclick = () => { $('#versionsPanel').hidden = true; };
   $('#btnPush').onclick = pushFlow;
+  $('#btnCopy').onclick = copyFlow;
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !$('#modal').hidden) { closeModal(); return; }
@@ -825,9 +831,10 @@ async function showDiff(oldCfg, newCfg, oldLabel, newLabel, title) {
 }
 
 // ------------------------------------------------------------------ Versionen & Übertragen
-function promptText(title, label, placeholder, okLabel) {
+function promptText(title, label, placeholder, okLabel, value = '') {
   return new Promise((resolve) => {
     const inp = el('input', { type: 'text', class: 'input', placeholder });
+    inp.value = value;
     let done = false;
     openModal(title, [el('label', {}, label), inp], [
       { label: 'Abbrechen', action: () => { done = true; resolve(null); return true; } },
@@ -929,6 +936,256 @@ async function pushFlow() {
     } },
   ]);
   msg.focus();
+}
+
+// ------------------------------------------------------------------ Dashboard kopieren
+function fillDashSelect() {
+  $('#dashSelect').replaceChildren(...S.dashboards.map((d) => el('option', { value: d.key },
+    d.title + (d.mode === 'yaml' ? ' (YAML-Modus, nur lesen)' : ''))));
+  if (S.dash) $('#dashSelect').value = S.dash;
+}
+
+function slugify(t) {
+  return String(t || '').toLowerCase()
+    .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+async function copyFlow() {
+  const src = S.dashboards.find((d) => d.key === S.dash) || { title: 'Dashboard', key: S.dash };
+  const base = slugify(src.key === DEFAULT_KEY ? 'lovelace' : src.key) || 'dashboard';
+  const taken = new Set(S.dashboards.map((d) => d.key));
+  let url = `${base}-kopie`;
+  for (let i = 2; taken.has(url); i++) url = `${base}-kopie-${i}`;
+  const title = el('input', { type: 'text', class: 'input', value: `${src.title} (Kopie)` });
+  const path = el('input', { type: 'text', class: 'input', value: url });
+  const side = el('input', { type: 'checkbox', checked: true });
+  const dirty = isDirty();
+  const fromEditor = el('input', { type: 'radio', name: 'cpsrc', checked: dirty });
+  const fromHa = el('input', { type: 'radio', name: 'cpsrc', checked: !dirty });
+  const err = el('div', { class: 'err' });
+  openModal(`„${src.title}“ kopieren`, [
+    el('div', { class: 'hint' }, 'Legt in Home Assistant ein neues Dashboard mit demselben Inhalt an. ',
+      'Das Original bleibt unverändert; du bearbeitest danach die Kopie.'),
+    el('div', { class: 'form' },
+      el('span', {}, 'Titel'), title,
+      el('span', {}, 'URL'), path,
+      el('label', { class: 'full' }, side, 'In der HA-Seitenleiste anzeigen'),
+      el('label', { class: 'full' }, fromHa, 'Stand aus Home Assistant kopieren'),
+      el('label', { class: 'full' }, fromEditor, 'Aktuellen Editor-Stand kopieren' + (dirty ? ' (mit deinen noch nicht übertragenen Änderungen)' : ''))),
+    err,
+  ], [
+    { label: 'Abbrechen' },
+    { label: 'Kopie anlegen', primary: true, action: async () => {
+      if (!fromEditor.checked && dirty && !confirm('Deine nicht übertragenen Änderungen am Original gehen beim Wechsel zur Kopie verloren. Fortfahren?')) return false;
+      try {
+        const r = await api('dashboards/copy', { method: 'POST', body: {
+          source: S.dash, title: title.value, url_path: slugify(path.value), show_in_sidebar: side.checked,
+          icon: src.icon || null, config: fromEditor.checked ? S.config : null } });
+        S.dashboards = await api('dashboards');
+        S.baseJSON = JSON.stringify(S.config); // kein Rückfragen beim Wechsel
+        fillDashSelect();
+        await loadDashboard(r.key);
+        toast(`Kopie „${title.value}“ angelegt – du bearbeitest jetzt die Kopie.`, 'ok');
+        return true;
+      } catch (e) { err.textContent = e.message; return false; }
+    } },
+  ]);
+  title.focus();
+}
+
+// ------------------------------------------------------------------ Vorlagen
+async function loadTemplates() {
+  try { S.templates = await api('templates'); } catch (e) { S.templates = []; }
+  renderTemplates();
+}
+
+function renderTemplates() {
+  const box = $('#tplList');
+  $('#tplCount').textContent = S.templates.length ? `(${S.templates.length})` : '';
+  if (!S.templates.length) {
+    box.replaceChildren(el('div', { class: 'hint' }, 'Noch keine Vorlagen. Fahre über eine Karte und klicke ', mdi('mdi:star-outline'),
+      ', um sie hier abzulegen.'));
+    return;
+  }
+  box.replaceChildren(...S.templates.map((t) => {
+    const info = cardInfo(t.card);
+    const ents = templateEntities(t.card);
+    const area = guessArea(ents);
+    const n = el('div', { class: 'tpl', draggable: 'true', title: 'In einen Abschnitt ziehen' },
+      mdi(info.icon),
+      el('div', { class: 'tpl-text' }, el('div', { class: 'tpl-name' }, t.name),
+        el('div', { class: 'tpl-sub' }, info.type + (ents.length ? ` · ${ents.length} Entität(en)` : '') + (area ? ` · ${area}` : ''))),
+      el('button', { class: 'icon', title: 'Umbenennen', onclick: (e) => { e.stopPropagation(); renameTemplate(t); } }, el('i', { class: 'mdi mdi-pencil-outline' })),
+      el('button', { class: 'icon danger', title: 'Vorlage löschen', onclick: (e) => { e.stopPropagation(); deleteTemplate(t); } }, el('i', { class: 'mdi mdi-delete-outline' })));
+    n.addEventListener('dragstart', (e) => { S.drag = { src: 'template', id: t.id }; e.dataTransfer.effectAllowed = 'copy'; e.dataTransfer.setData('text/plain', 'tpl'); });
+    n.addEventListener('dblclick', () => insertTemplate(t.id, { quick: true }));
+    return n;
+  }));
+}
+
+async function saveAsTemplate(card) {
+  const name = await promptText('Als Vorlage speichern', 'Name der Vorlage:', 'z. B. Raumkarte', 'Speichern', cardInfo(card).title);
+  if (name === null) return;
+  if (!name.trim()) { toast('Bitte einen Namen angeben', 'err'); return; }
+  try {
+    await api('templates', { method: 'POST', body: { name: name.trim(), card } });
+    toast(`Vorlage „${name.trim()}“ gespeichert`, 'ok');
+    loadTemplates();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function renameTemplate(t) {
+  const name = await promptText('Vorlage umbenennen', 'Neuer Name:', '', 'Speichern', t.name);
+  if (!name || !name.trim()) return;
+  try { await api('templates/' + t.id, { method: 'PATCH', body: { name: name.trim() } }); loadTemplates(); } catch (e) { toast(e.message, 'err'); }
+}
+
+async function deleteTemplate(t) {
+  if (!confirm(`Vorlage „${t.name}“ löschen?`)) return;
+  try { await api('templates/' + t.id, { method: 'DELETE' }); loadTemplates(); } catch (e) { toast(e.message, 'err'); }
+}
+
+const ENT_RE = /[a-z_]+\.[a-z0-9_]+/g;
+function templateEntities(card) {
+  const set = new Set();
+  (function walk(o) {
+    if (typeof o === 'string') {
+      for (const m of o.match(ENT_RE) || []) if (S.entMap[m] || DOMAIN_ICON[m.split('.')[0]]) set.add(m);
+    } else if (Array.isArray(o)) o.forEach(walk);
+    else if (o && typeof o === 'object') Object.values(o).forEach(walk);
+  })(card);
+  return [...set];
+}
+
+function guessArea(ids) {
+  const cnt = {};
+  for (const id of ids) { const a = S.entMap[id] && S.entMap[id].area; if (a) cnt[a] = (cnt[a] || 0) + 1; }
+  return Object.entries(cnt).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+}
+
+function areaTokens(area) {
+  const t = new Set();
+  for (const w of String(area || '').split(/\s+/)) {
+    const a = slugify(w).replace(/-/g, '');
+    const b = w.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
+    if (a) t.add(a);
+    if (b) t.add(b);
+  }
+  return t;
+}
+
+function restTokens(id, area) {
+  const skip = areaTokens(area);
+  return id.split('.')[1].split('_').filter((x) => x && !skip.has(x));
+}
+
+// Passende Entität im Zielbereich finden: gleiche Domain + device_class, dann ähnlichster Name
+function findCounterpart(id, srcArea, dstArea, used) {
+  const src = S.entMap[id];
+  const domain = id.split('.')[0];
+  const want = restTokens(id, srcArea);
+  let best = null; let bestScore = -1;
+  for (const e of S.entities) {
+    if (e.area !== dstArea || e.domain !== domain || used.has(e.entity_id)) continue;
+    let score = 0;
+    if (src && src.device_class && e.device_class === src.device_class) score += 5;
+    else if (src && src.device_class && e.device_class && e.device_class !== src.device_class) continue;
+    const have = restTokens(e.entity_id, dstArea);
+    const common = want.filter((w) => have.includes(w)).length;
+    score += common * 2 - Math.abs(have.length - want.length) * 0.5;
+    if (score > bestScore) { bestScore = score; best = e.entity_id; }
+  }
+  return best;
+}
+
+function applyTemplate(card, map, nameFrom, nameTo) {
+  const ids = Object.keys(map).filter((k) => map[k] && map[k] !== k).sort((a, b) => b.length - a.length);
+  const re = ids.length ? new RegExp('(?<![a-z0-9_.])(' + ids.map((i) => i.replace(/\./g, '\\.')).join('|') + ')(?![a-z0-9_])', 'g') : null;
+  const nameRe = nameFrom && nameTo && nameFrom !== nameTo ? new RegExp(nameFrom.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g') : null;
+  return (function walk(o) {
+    if (typeof o === 'string') {
+      let s = re ? o.replace(re, (m) => map[m]) : o;
+      if (nameRe) s = s.replace(nameRe, nameTo);
+      return s;
+    }
+    if (Array.isArray(o)) return o.map(walk);
+    if (o && typeof o === 'object') return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, walk(v)]));
+    return o;
+  })(clone(card));
+}
+
+function placeCard(card, place) {
+  mutate(() => {
+    const v = S.config.views[place.view ?? S.view] || curView();
+    if (place.newSection) {
+      if (!v.sections) v.sections = [];
+      v.sections.push({ type: 'grid', cards: [card] });
+    } else if (place.cid) {
+      getCards(v, place.cid, true).splice(place.index, 0, card);
+    } else if (Array.isArray(v.sections) || v.type === 'sections') {
+      if (!v.sections || !v.sections.length) v.sections = [{ type: 'grid', cards: [] }];
+      getCards(v, 's' + (v.sections.length - 1), true).push(card);
+    } else getCards(v, 'c', true).push(card);
+  });
+}
+
+function insertTemplate(id, place) {
+  const t = S.templates.find((x) => x.id === id);
+  if (!t) return;
+  if (!curView()) { toast('Erst eine Ansicht anlegen', 'err'); return; }
+  const ents = templateEntities(t.card);
+  if (!ents.length) { placeCard(clone(t.card), place); return; }
+
+  const srcArea = guessArea(ents);
+  const areas = [...new Set(S.entities.map((e) => e.area).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de'));
+  const areaSel = el('select', {}, el('option', { value: '' }, '– Entitäten nicht tauschen –'),
+    ...areas.map((a) => el('option', { value: a }, a + (a === srcArea ? ' (wie Vorlage)' : ''))));
+  areaSel.value = srcArea || '';
+  const rename = el('input', { type: 'checkbox', checked: true });
+  const renameLbl = el('label', { class: 'full' }, rename, el('span', {}));
+  const dl = el('datalist', { id: 'entOptions' }, ...S.entities.map((e) => el('option', { value: e.entity_id }, e.name)));
+  const rows = ents.map((eid) => {
+    const inp = el('input', { type: 'text', list: 'entOptions', value: eid, spellcheck: 'false' });
+    const note = el('small', {});
+    const tr = el('tr', {},
+      el('td', {}, (S.entMap[eid] && S.entMap[eid].name) || eid, el('small', {}, eid)),
+      el('td', {}, inp, note));
+    return { eid, inp, note, tr };
+  });
+  const update = () => {
+    const dst = areaSel.value;
+    const used = new Set();
+    for (const r of rows) {
+      r.tr.classList.remove('nomatch'); r.note.textContent = '';
+      if (!dst || dst === srcArea) { r.inp.value = r.eid; continue; }
+      const cp = findCounterpart(r.eid, srcArea, dst, used);
+      if (cp) { r.inp.value = cp; used.add(cp); r.note.textContent = S.entMap[cp].name; }
+      else { r.inp.value = r.eid; r.tr.classList.add('nomatch'); r.note.textContent = 'keine Entsprechung in diesem Bereich – bitte selbst wählen'; }
+    }
+    const show = srcArea && dst && dst !== srcArea;
+    renameLbl.hidden = !show;
+    renameLbl.lastChild.textContent = show ? `Text „${srcArea}“ durch „${dst}“ ersetzen` : '';
+  };
+  areaSel.addEventListener('change', update);
+  update();
+
+  openModal(`Vorlage „${t.name}“ einfügen`, [
+    el('div', { class: 'hint' }, 'Wähle den Bereich, für den die Karte sein soll. Passende Entitäten (gleicher Typ) werden automatisch eingesetzt; du kannst jede Zuordnung anpassen.'),
+    el('div', { class: 'form' }, el('span', {}, 'Bereich'), areaSel, renameLbl),
+    el('table', { class: 'maptable' }, el('tbody', {}, rows.map((r) => r.tr))),
+    dl,
+  ], [
+    { label: 'Abbrechen' },
+    { label: 'Einfügen', primary: true, action: () => {
+      const map = Object.fromEntries(rows.map((r) => [r.eid, r.inp.value.trim() || r.eid]));
+      const dst = areaSel.value;
+      const card = applyTemplate(t.card, map, rename.checked && srcArea && dst ? srcArea : null, dst || null);
+      placeCard(card, place);
+      return true;
+    } },
+  ]);
 }
 
 init();
