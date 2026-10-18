@@ -171,29 +171,49 @@ def _demo_data():
 
     area_list = [{"area_id": a, "name": n, "floor_id": f} for a, n, f in areas]
 
+    def bg(color):
+        return {"style": f"ha-card {{\n  background: {color};\n}}\n"}
+
+    def room(name, aid, icon, color, bgc, extra=""):
+        return {"type": "custom:mushroom-template-card", "primary": name, "icon": icon, "icon_color": color,
+                "entity": f"sensor.{aid}_temperatur", "multiline_secondary": True,
+                "secondary": f"🌡 {{{{ states('sensor.{aid}_temperatur') }}}} °C\n💧 {{{{ states('sensor.{aid}_luftfeuchtigkeit') }}}} %" + extra,
+                "grid_options": {"columns": 3}, "card_mod": bg(bgc)}
+
+    def stat(primary, secondary, icon, color, bgc):
+        return {"type": "custom:mushroom-template-card", "primary": primary, "secondary": secondary, "icon": icon,
+                "icon_color": color, "grid_options": {"columns": 3}, "card_mod": bg(bgc)}
+
+    keller = "rgba(63,81,181,0.10)"
+    etage = "rgba(146,107,199,0.14)"
     config = {"title": "Enterprise", "views": [
         {"title": "Übersicht", "path": "uebersicht", "icon": "mdi:view-dashboard",
          "type": "sections", "max_columns": 4, "sections": [
             {"type": "grid", "column_span": 4, "cards": [
                 {"type": "heading", "heading": "Status"},
-                {"type": "tile", "entity": "alarm_control_panel.alarmanlage", "grid_options": {"columns": 3}},
-                {"type": "tile", "entity": "sensor.schlafzimmer_luftfeuchtigkeit", "name": "Höchste Feuchtigkeit",
-                 "grid_options": {"columns": 3}},
-                {"type": "tile", "entity": "sensor.frigate_personen_heute", "grid_options": {"columns": 3}},
-                {"type": "tile", "entity": "sensor.frigate_bewegungen_heute", "grid_options": {"columns": 3}},
+                stat("Alarmstatus", "Alles in Ordnung", "mdi:shield-home", "green", "rgba(76,175,80,0.12)"),
+                stat("Höchste Feuchtigkeit", "{{ states('sensor.schlafzimmer_luftfeuchtigkeit') }} % · Schlafzimmer", "mdi:water-percent", "orange", "rgba(33,150,243,0.10)"),
+                stat("Aktive Entfeuchter", "0 aktiv", "mdi:air-humidifier", "blue", "rgba(33,150,243,0.10)"),
+                stat("Kamera", "👤 Heute: {{ states('sensor.frigate_personen_heute') }}\n🚶 Bewegungen: {{ states('sensor.frigate_bewegungen_heute') }}", "mdi:cctv", "blue", "rgba(33,150,243,0.10)"),
             ]},
-            {"type": "grid", "column_span": 2, "cards": [
+            {"type": "grid", "column_span": 4, "cards": [
                 {"type": "heading", "heading": "Keller", "icon": "mdi:arrow-down-bold"},
-                {"type": "custom:mushroom-template-card", "primary": "Technikraum",
-                 "secondary": "{{ states('sensor.technikraum_temperatur') }} °C · {{ states('sensor.technikraum_luftfeuchtigkeit') }} %",
-                 "icon": "mdi:server", "entity": "sensor.technikraum_temperatur"},
-                {"type": "custom:mushroom-template-card", "primary": "Büro",
-                 "secondary": "{{ states('sensor.buero_temperatur') }} °C", "icon": "mdi:desk"},
+                room("Technikraum", "technikraum", "mdi:server", "blue", keller, "\n🖥 HAOS Steckdose · 🔌 Entfeuchter aus"),
+                room("Büro", "buero", "mdi:desk", "brown", keller),
+                room("Hobbyraum", "hobbyraum", "mdi:gamepad-variant", "purple", keller, "\n🔌 Entfeuchter aus"),
+            ]},
+            {"type": "grid", "column_span": 4, "cards": [
+                {"type": "heading", "heading": "1. Etage", "icon": "mdi:arrow-up-bold"},
+                room("Schlafzimmer", "schlafzimmer", "mdi:bed", "teal", etage),
+                room("Bad", "bad", "mdi:bathtub-outline", "light-blue", etage, "\n🔌 Entfeuchter aus"),
             ]},
             {"type": "grid", "column_span": 2, "cards": [
-                {"type": "heading", "heading": "Steuerung"},
-                {"type": "entities", "title": "Entfeuchter",
-                 "entities": ["switch.entfeuchter_hobbyraum", "switch.entfeuchter_technikraum", "switch.entfeuchter_bad"]},
+                {"type": "heading", "heading": "Entfeuchter"},
+                {"type": "entities", "entities": ["switch.entfeuchter_hobbyraum", "switch.entfeuchter_technikraum", "switch.entfeuchter_bad"]},
+            ]},
+            {"type": "grid", "column_span": 2, "cards": [
+                {"type": "heading", "heading": "Wichtige Steckdosen"},
+                {"type": "entities", "entities": ["switch.haos_steckdose", "switch.kuehlschrank", "switch.steckdose_hobbyraum"]},
             ]},
         ]},
         {"title": "Technikraum", "path": "technikraum", "icon": "mdi:server",

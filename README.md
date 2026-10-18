@@ -42,21 +42,23 @@ DEMO=1 DATA_DIR=./data PORT=8114 python3 -m app       # mit Beispieldaten, ohne 
 DEMO=1 DATA_DIR=/tmp/hdb python3 -m unittest discover -s tests
 ```
 
-## Bedienung
+## Bedienung (wie PowerPoint)
 
 | Aktion | So geht's |
 |---|---|
-| Karte anlegen | Entität aus der Palette in einen Abschnitt ziehen (Kartentyp unter „Neue Karte als“ wählen) |
-| Schnell anhängen | Doppelklick auf eine Entität: Sie wird an den letzten Abschnitt angehängt |
-| Zeile zu Entities-Karte | Entität mitten auf die Karte ziehen (gestrichelter Rahmen) |
-| Neuer Abschnitt | „+ Abschnitt“ oder Element auf das Feld „Neuer Abschnitt“ ziehen |
-| Abschnitt verschieben | am Griff ⠿ ziehen; Breite mit ↔-Buttons |
-| Karte in andere Ansicht | Karte auf den Tab der Ziel-Ansicht ziehen |
-| Karte bearbeiten | Doppelklick oder ✎: YAML-Editor |
-| Dashboard kopieren | „Kopieren …“ oben: neues Dashboard in HA anlegen, das Original bleibt unverändert |
-| Vorlage speichern | über eine Karte fahren → ★ |
-| Vorlage einfügen | Vorlage aus der Palette ziehen → Bereich wählen: Entitäten und Raumname werden getauscht |
-| Masonry-Ansicht | „In Abschnitte umwandeln“ macht daraus eine Sections-Ansicht |
+| Auswählen | Karte anklicken → blauer Rahmen, rechts erscheint das **Format**-Fenster |
+| Ändern | Im Format-Fenster Titel, Werte, Icon, Farben, Hintergrund, Entität einstellen – die Vorschau ändert sich sofort |
+| Verschieben | Karte ziehen; die anderen Karten weichen aus, die Karte rastet ein. Auch in andere Abschnitte oder auf einen Ansicht-Reiter |
+| Größe | An den Anfassern rechts/unten ziehen (Breite in 12tel, Höhe in Zeilen) oder im Format-Fenster wählen |
+| Abschnitt | Über der Abschnitt-Leiste auswählen/ziehen; Breite am blauen Rand rechts |
+| Einfügen | Baustein, Vorlage oder Entität aus der linken Leiste auf die Fläche ziehen (oder doppelklicken) |
+| Liste ergänzen | Entität mitten auf eine Liste ziehen |
+| Menü | Rechtsklick auf Karte, Abschnitt oder Fläche |
+| Tastatur | Entf löschen · Strg+C/X/V kopieren/ausschneiden/einfügen · Strg+D duplizieren · Strg+Z/Y · ←/→ Reihenfolge |
+| Vorschau | oben PC / Tablet / Handy, unten Zoom |
+| Dashboard kopieren | „Kopieren …“: neues Dashboard in HA anlegen, das Original bleibt unverändert |
+| Vorlagen | Rechtsklick → „Als Vorlage speichern“; beim Einfügen Raum wählen, Entitäten werden getauscht |
+| Sonderfälle | Rechtsklick → „Code bearbeiten …“ |
 
 **Wichtig:** Änderungen sind erst nach **Übertragen …** in Home Assistant aktiv. „Version speichern“ sichert nur einen Entwurf in der App. Unbekannte Optionen und Karten (custom cards, card-mod usw.) bleiben unverändert erhalten. Dashboards im **YAML-Modus** kann HA nicht über die API speichern; diese kannst du nur ansehen und herunterladen.
 
